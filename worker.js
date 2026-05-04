@@ -876,26 +876,31 @@ function getMainHTML() {
         console.log(\`%c Multi-Layer Shadow DOM Protection: \${SHADOW_LAYERS} Layers\`, 'color: #10b981; font-size: 14px; font-weight: bold;');
         
         // Register Service Worker for PWA
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then((registration) => {
-                        console.log('%c PWA Service Worker registered', 'color: #667eea; font-weight: bold;');
-                        
-                        registration.addEventListener('updatefound', () => {
-                            const newWorker = registration.installing;
-                            newWorker.addEventListener('statechange', () => {
-                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    console.log('%c New version available!', 'color: #10b981; font-weight: bold;');
-                                }
-                            });
-                        });
-                    })
-                    .catch((error) => {
-                        console.log('Service Worker registration failed:', error);
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+                console.log('%c PWA Service Worker registered', 'color: #667eea; font-weight: bold;');
+                
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('%c New version available!', 'color: #10b981; font-weight: bold;');
+                        }
                     });
+                });
+
+                navigator.serviceWorker.ready.then(() => {
+                    console.log('%c Service Worker is controlling the page', 'color: #10b981; font-weight: bold;');
+                });
+
+            })
+            .catch((error) => {
+                console.log('Service Worker registration failed:', error);
             });
-        }
+    });
+}
         
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -913,16 +918,29 @@ function getMainHTML() {
 
 function getManifest() {
   return JSON.stringify({
+    "id": "/?source=pwa",
     "name": "Google Classroom",
-    "short_name": "Google Classroom",
-    "description": "Google Classroom is a free, secure, and easy-to-use blended learning platform within Google Workspace for Education that allows educators to create, distribute, and grade assignments in one place.",
-    "start_url": "/",
+    "short_name": "Classroom",
+    "description": "A Simple way for Parents, Students, And teachers to connect trought learning using Googles most powerfull Google classroom version yet",
+    
+    "start_url": "/?source=pwa",
+    "scope": "/",
+    
     "display": "standalone",
+    "display_override": ["standalone", "minimal-ui"],
+    
     "background_color": "#0d1117",
     "theme_color": "#2d2d2d",
+    
     "orientation": "any",
-    "scope": "/",
+    
     "icons": [
+      {
+        "src": "/favicon.png",
+        "sizes": "192x192",
+        "type": "image/png",
+        "purpose": "any maskable"
+      },
       {
         "src": "/favicon.png",
         "sizes": "512x512",
@@ -930,23 +948,10 @@ function getManifest() {
         "purpose": "any maskable"
       }
     ],
-    "categories": ["education", "learning"],
-    "screenshots": [],
-    "shortcuts": [
-      {
-        "name": "Open Classroom",
-        "short_name": "Open Classroom",
-        "description": "Open Google Classroom",
-        "url": "/",
-        "icons": [
-          {
-            "src": "/favicon.png",
-            "sizes": "96x96",
-            "type": "image/png"
-          }
-        ]
-      }
-    ]
+    
+    "categories": ["games", "entertainment"],
+    
+    "prefer_related_applications": false
   });
 }
 
