@@ -1,7 +1,9 @@
 // Cloudflare Worker - CloudMoon Proxy with Multi-Layer Shadow DOM Protection + Ad Blocking
-addEventListener('fetch', event => {
-  event.respondWith(handleRequest(event.request));
-});
+export default {
+  async fetch(request) {
+    return handleRequest(request);
+  }
+};
 
 // Common ad domains and patterns to block
 const AD_PATTERNS = [
@@ -66,7 +68,7 @@ async function handleRequest(request) {
   // Serve manifest.json for PWA
   if (url.pathname === '/manifest.json') {
     return new Response(getManifest(), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/manifest+json' }
     });
   }
   
@@ -84,6 +86,56 @@ async function handleRequest(request) {
   if (url.pathname === '/favicon.png') {
     const iconRes = await fetch('https://ssl.gstatic.com/classroom/favicon.png');
     const iconHeaders = new Headers(iconRes.headers);
+    iconHeaders.set('Cache-Control', 'public, max-age=86400');
+    return new Response(iconRes.body, {
+      status: iconRes.status,
+      headers: iconHeaders
+    });
+  }
+
+  // Serve PWA icon — Google Classroom product logo SVG (resolution-independent)
+  if (url.pathname === '/icon.svg') {
+    let iconRes = await fetch('https://fonts.gstatic.com/s/i/productlogos/classroom/v8/192px.svg');
+    const isSVG = iconRes.ok;
+    if (!isSVG) {
+      // Fallback to the standard favicon if the versioned SVG is unavailable
+      iconRes = await fetch('https://ssl.gstatic.com/classroom/favicon.png');
+    }
+    const iconHeaders = new Headers(iconRes.headers);
+    iconHeaders.set('Content-Type', isSVG ? 'image/svg+xml' : 'image/png');
+    iconHeaders.set('Cache-Control', 'public, max-age=86400');
+    return new Response(iconRes.body, {
+      status: iconRes.status,
+      headers: iconHeaders
+    });
+  }
+
+  // Serve 192x192 PNG icon for PWA (Chrome requires rasterized icons for install)
+  if (url.pathname === '/icon-192.png') {
+    let iconRes = await fetch('https://fonts.gstatic.com/s/i/productlogos/classroom/v8/192px.png');
+    if (!iconRes.ok) {
+      iconRes = await fetch('https://ssl.gstatic.com/classroom/favicon.png');
+    }
+    const iconHeaders = new Headers(iconRes.headers);
+    iconHeaders.set('Content-Type', 'image/png');
+    iconHeaders.set('Cache-Control', 'public, max-age=86400');
+    return new Response(iconRes.body, {
+      status: iconRes.status,
+      headers: iconHeaders
+    });
+  }
+
+  // Serve 512x512 PNG icon for PWA splash screen
+  if (url.pathname === '/icon-512.png') {
+    let iconRes = await fetch('https://fonts.gstatic.com/s/i/productlogos/classroom/v8/512px.png');
+    if (!iconRes.ok) {
+      iconRes = await fetch('https://fonts.gstatic.com/s/i/productlogos/classroom/v8/192px.png');
+    }
+    if (!iconRes.ok) {
+      iconRes = await fetch('https://ssl.gstatic.com/classroom/favicon.png');
+    }
+    const iconHeaders = new Headers(iconRes.headers);
+    iconHeaders.set('Content-Type', 'image/png');
     iconHeaders.set('Cache-Control', 'public, max-age=86400');
     return new Response(iconRes.body, {
       status: iconRes.status,
@@ -340,17 +392,57 @@ async function proxyCloudMoon(request) {
   
   // Intercept window.open for games - now proxy through worker
   var origOpen = window.open;
-  window.open = function(u, t, f) {
-    if (u && u.indexOf("run-site") > -1) {
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage({type: "LOAD_GAME", url: u}, "*");
-      } else {
-        window.location.href = u;
+  var workerOrigin = window.location.origin;
+
+  function sendGameUrl(url) {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({type: "LOAD_GAME", url: url}, workerOrigin);
+    }
+  }
+
+  function makeFakeWindow() {
+    // Returns a fake window for about:blank intercepts.
+    // CloudMoon pattern: var w = window.open(); w.location.href = gameUrl;
+    var locObj = { _href: 'about:blank' };
+    Object.defineProperty(locObj, 'href', {
+      get: function() { return this._href; },
+      set: function(url) {
+        this._href = url;
+        if (typeof url === 'string' && url.indexOf('/run-site/') > -1) { sendGameUrl(url); }
       }
-      return {closed: false, close: function(){}, focus: function(){}};
+    });
+    locObj.assign = function(url) { locObj.href = url; };
+    locObj.replace = function(url) { locObj.href = url; };
+    return {
+      closed: false,
+      close: function(){}, focus: function(){}, blur: function(){},
+      location: locObj,
+      document: { write: function(){}, close: function(){}, open: function(){} }
+    };
+  }
+
+  window.open = function(u, t, f) {
+    // Direct run-site URL
+    if (u && u.indexOf('/run-site/') > -1) {
+      sendGameUrl(u);
+      return makeFakeWindow();
+    }
+    // about:blank / no-URL pattern — return fake window to capture subsequent location.href set
+    if (!u || u === '' || u === 'about:blank') {
+      return makeFakeWindow();
     }
     return origOpen.call(this, u, t, f);
   };
+
+  // Intercept anchor clicks for games (CloudMoon may use <a target="_blank"> instead of window.open)
+  document.addEventListener('click', function(e) {
+    var a = e.target.closest('a');
+    if (a && a.href && a.href.indexOf('/run-site/') > -1) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      sendGameUrl(a.href);
+    }
+  }, true);
   
   // Listen for fullscreen requests from parent
   window.addEventListener('message', function(event) {
@@ -615,7 +707,7 @@ function getMainHTML() {
             bottom: 18px;
             left: 18px;
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             gap: 10px;
             z-index: 9999;
             transition: opacity 0.3s;
@@ -651,7 +743,7 @@ function getMainHTML() {
             transform: scale(0.93);
         }
 
-        #home-btn {
+        #install-btn {
             display: none;
         }
     </style>
@@ -671,6 +763,11 @@ function getMainHTML() {
         <button class="dock-btn" id="fullscreen-btn" onclick="enterFullscreen()" title="Fullscreen">
             <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+            </svg>
+        </button>
+        <button class="dock-btn" id="install-btn" onclick="installPWA()" title="Install App">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
             </svg>
         </button>
     </div>
@@ -799,6 +896,7 @@ function getMainHTML() {
         });
         
         window.addEventListener('message', (event) => {
+            if (event.origin !== window.location.origin) return;
             if (event.data && event.data.type === 'LOAD_GAME') {
                 const gameUrl = event.data.url;
                 console.log('Game URL received:', gameUrl);
@@ -831,13 +929,11 @@ function getMainHTML() {
             createMultiLayerShadowFrame(fixedURL, true);
             
             isShowingGame = true;
-            homeBtn.style.display = 'flex';
         }
         
         function goBack() {
             createMultiLayerShadowFrame(mainURL, false);
             isShowingGame = false;
-            homeBtn.style.display = 'none';
 
             // Exit fullscreen if active
             if (document.fullscreenElement) {
@@ -846,31 +942,19 @@ function getMainHTML() {
         }
 
         function enterFullscreen() {
-            // Try to send message to iframe to fullscreen the game container
-            if (currentIframe) {
-                try {
-                    // Send message through all shadow layers to reach the iframe
-                    currentIframe.contentWindow.postMessage({type: 'REQUEST_FULLSCREEN'}, '*');
-                    console.log('Sent fullscreen request to game container');
-                } catch (e) {
-                    console.log('Cannot send message to iframe (cross-origin), using fallback');
-                    // Fallback to document fullscreen
-                    document.documentElement.requestFullscreen();
-                }
+            // Send message to the injected script inside the iframe so it can
+            // fullscreen #gameWrapper (the actual game element) via the Fullscreen API.
+            // Fall back to fullscreening the outer frame container if no iframe is ready.
+            if (currentIframe && currentIframe.contentWindow) {
+                currentIframe.contentWindow.postMessage({ type: 'REQUEST_FULLSCREEN' }, window.location.origin);
             } else {
-                // No iframe, use document fullscreen
-                document.documentElement.requestFullscreen();
+                const el = frameContainer;
+                if (el.requestFullscreen) el.requestFullscreen();
+                else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+                else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+                else if (el.msRequestFullscreen) el.msRequestFullscreen();
             }
-            // Hide the dock while fullscreen
-            btnDock.classList.add('hidden');
         }
-
-        document.addEventListener('fullscreenchange', () => {
-            if (!document.fullscreenElement) {
-                // Restore dock when exiting fullscreen
-                btnDock.classList.remove('hidden');
-            }
-        });
         
         console.log('%c CloudMoon Proxy Active with Ad Blocking', 'color: #667eea; font-size: 18px; font-weight: bold;');
         console.log(\`%c Multi-Layer Shadow DOM Protection: \${SHADOW_LAYERS} Layers\`, 'color: #10b981; font-size: 14px; font-weight: bold;');
@@ -903,13 +987,30 @@ if ('serviceWorker' in navigator) {
 }
         
         let deferredPrompt;
+        const installBtn = document.getElementById('install-btn');
+
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
+            installBtn.style.display = 'flex';
         });
-        
+
+        function installPWA() {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    installBtn.style.display = 'none';
+                }
+                deferredPrompt = null;
+            }).catch(() => {
+                deferredPrompt = null;
+            });
+        }
+
         window.addEventListener('appinstalled', () => {
             deferredPrompt = null;
+            installBtn.style.display = 'none';
         });
     </script>
 </body>
@@ -936,16 +1037,34 @@ function getManifest() {
     
     "icons": [
       {
-        "src": "/favicon.png",
+        "src": "/icon-192.png",
         "sizes": "192x192",
         "type": "image/png",
-        "purpose": "any maskable"
+        "purpose": "any"
       },
       {
-        "src": "/favicon.png",
+        "src": "/icon-192.png",
+        "sizes": "192x192",
+        "type": "image/png",
+        "purpose": "maskable"
+      },
+      {
+        "src": "/icon-512.png",
         "sizes": "512x512",
         "type": "image/png",
-        "purpose": "any maskable"
+        "purpose": "any"
+      },
+      {
+        "src": "/icon-512.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "maskable"
+      },
+      {
+        "src": "/icon.svg",
+        "sizes": "any",
+        "type": "image/svg+xml",
+        "purpose": "any"
       }
     ],
     
@@ -957,22 +1076,28 @@ function getManifest() {
 
 function getServiceWorker() {
   return `// CloudMoon InPlay Service Worker
-const CACHE_NAME = 'cloudmoon-v1';
-const RUNTIME_CACHE = 'cloudmoon-runtime';
+const CACHE_NAME = 'cloudmoon-v3';
+const RUNTIME_CACHE = 'cloudmoon-runtime-v3';
 
 // Install event - cache essential resources
 self.addEventListener('install', (event) => {
   console.log('[ServiceWorker] Install');
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
+    caches.open(CACHE_NAME).then(async (cache) => {
       console.log('[ServiceWorker] Caching app shell');
-      return cache.addAll([
-        '/',
-        '/manifest.json',
-        '/sw.js',
-        '/favicon.png'
-      ]);
-    }).then(() => {
+      // Cache critical resources; skip optional ones that may fail (e.g. proxied icons)
+      const critical = ['/', '/manifest.json', '/sw.js'];
+      const optional = ['/favicon.png', '/icon.svg', '/icon-192.png', '/icon-512.png'];
+      await cache.addAll(critical);
+      await Promise.allSettled(
+        optional.map(url =>
+          fetch(url).then(res => {
+            if (res && res.status === 200) return cache.put(url, res);
+          }).catch((err) => {
+            console.log('[ServiceWorker] Optional resource not cached:', url, err);
+          })
+        )
+      );
       return self.skipWaiting();
     })
   );
@@ -1001,6 +1126,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests - let browser handle them
   if (!event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
+  // Skip dynamic game session and proxy requests - these can't be meaningfully cached
+  const reqPath = new URL(event.request.url).pathname;
+  if (reqPath.startsWith('/run-site/') || reqPath.startsWith('/proxy/')) {
     return;
   }
 
