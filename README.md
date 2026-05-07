@@ -232,3 +232,5 @@ After that, you can use the Control bar for navigation, and go home using the ho
 - [x] Renove Adboxes in Game
 - [x] Add Fullscreen Typebox Fix
 - [ ] Add Sidebar Hiding Fix
+- [ ] Add PWA Functionality
+- [ ] Add About:Blank Cloaking
