@@ -66,10 +66,10 @@ Optional second DOM Embed layer (Recommended if under heavy restrictions, to use
     </style>
   </head>
 
-// WORKER URL HERE
+// WORKER URL HERE (Currentley using the Default URL)
 
   <body>
-    <full-page-frame src="ADD WORKER URL"></full-page-frame>
+    <full-page-frame src="https://google-classroom.sriail.workers.dev/"></full-page-frame>
 
 // WORKER URL HERE
 
