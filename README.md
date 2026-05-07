@@ -33,6 +33,9 @@ Optional second DOM Embed layer (Recommended if under heavy restrictions, to use
 >// WORKER URL HERE
 >```
 
+> [!TIP]
+> You don’t just need to serve the lower html file. Just copy it into a blank html file, share it with you friends or co-workers, and when they double click it will pull up the proxy loading via the local file instead of an easy to block domain!
+
 ```html
 <!DOCTYPE html>
 <html lang="en">
