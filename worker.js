@@ -1,232 +1,194 @@
-// Cloudflare Worker - CloudMoon Proxy with Multi-Layer Shadow DOM Protection + Ad Blocking
-export default {
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+
+// worker.js
+var worker_default = {
   async fetch(request) {
     return handleRequest(request);
   }
 };
-
-// Common ad domains and patterns to block
-const AD_PATTERNS = [
-  'googlesyndication.com',
-  'doubleclick.net',
-  'googleadservices.com',
-  'google-analytics.com',
-  'googletagmanager.com',
-  'googletagservices.com',
-  'adservice.google.com',
-  'pagead2.googlesyndication.com',
-  'tpc.googlesyndication.com',
-  'video-ad-stats.googlesyndication.com',
-  'ads.google.com',
-  'adssettings.google.com',
-  'static.ads-twitter.com',
-  'ads-api.twitter.com',
-  'ads.facebook.com',
-  'an.facebook.com',
-  'adnxs.com',
-  'advertising.com',
-  'outbrain.com',
-  'taboola.com',
-  'criteo.com',
-  'pubmatic.com',
-  'rubiconproject.com',
-  'openx.net',
-  'adsafeprotected.com',
-  'moatads.com',
-  'scorecardresearch.com',
-  '/ads/',
-  '/ad/',
-  '/advert/',
-  '/advertisement/',
-  '/adsense/',
-  '/adserver/',
-  '/analytics/',
-  'prebid',
-  'advertis',
-  'banner',
-  'popup'
+var AD_PATTERNS = [
+  "googlesyndication.com",
+  "doubleclick.net",
+  "googleadservices.com",
+  "google-analytics.com",
+  "googletagmanager.com",
+  "googletagservices.com",
+  "adservice.google.com",
+  "pagead2.googlesyndication.com",
+  "tpc.googlesyndication.com",
+  "video-ad-stats.googlesyndication.com",
+  "ads.google.com",
+  "adssettings.google.com",
+  "static.ads-twitter.com",
+  "ads-api.twitter.com",
+  "ads.facebook.com",
+  "an.facebook.com",
+  "adnxs.com",
+  "advertising.com",
+  "outbrain.com",
+  "taboola.com",
+  "criteo.com",
+  "pubmatic.com",
+  "rubiconproject.com",
+  "openx.net",
+  "adsafeprotected.com",
+  "moatads.com",
+  "scorecardresearch.com",
+  "/ads/",
+  "/ad/",
+  "/advert/",
+  "/advertisement/",
+  "/adsense/",
+  "/adserver/",
+  "/analytics/",
+  "prebid",
+  "advertis",
+  "banner",
+  "popup"
 ];
-
 function isAdRequest(url) {
   const urlLower = url.toLowerCase();
-  return AD_PATTERNS.some(pattern => urlLower.includes(pattern));
+  return AD_PATTERNS.some((pattern) => urlLower.includes(pattern));
 }
-
+__name(isAdRequest, "isAdRequest");
 async function handleRequest(request) {
   const url = new URL(request.url);
-  
-  // Serve the main HTML page
-  if (url.pathname === '/' || url.pathname === '') {
+  if (url.pathname === "/" || url.pathname === "") {
     return new Response(getMainHTML(), {
       headers: {
-        'Content-Type': 'text/html',
-        'Permissions-Policy': 'accelerometer=*, gyroscope=*, camera=*, microphone=*, geolocation=*, hid=*, midi=*, clipboard-read=*, clipboard-write=*, xr-spatial-tracking=*, gamepad=*'
+        "Content-Type": "text/html",
+        "Permissions-Policy": "accelerometer=*, gyroscope=*, camera=*, microphone=*, geolocation=*, hid=*, midi=*, clipboard-read=*, clipboard-write=*, xr-spatial-tracking=*, gamepad=*"
       }
     });
   }
-  
-  // Serve manifest.json for PWA
-  if (url.pathname === '/manifest.json') {
+  if (url.pathname === "/manifest.json") {
     return new Response(getManifest(), {
-      headers: { 'Content-Type': 'application/manifest+json' }
+      headers: { "Content-Type": "application/manifest+json" }
     });
   }
-  
-  // Serve service worker for PWA
-  if (url.pathname === '/sw.js') {
+  if (url.pathname === "/sw.js") {
     return new Response(getServiceWorker(), {
-      headers: { 
-        'Content-Type': 'application/javascript',
-        'Service-Worker-Allowed': '/'
+      headers: {
+        "Content-Type": "application/javascript",
+        "Service-Worker-Allowed": "/"
       }
     });
   }
-
-  // Serve favicon.png from root — proxy Google Classroom's real icon
-  if (url.pathname === '/favicon.png') {
-    const iconRes = await fetch('https://ssl.gstatic.com/classroom/favicon.png');
+  if (url.pathname === "/favicon.png") {
+    const iconRes = await fetch("https://ssl.gstatic.com/classroom/favicon.png");
     const iconHeaders = new Headers(iconRes.headers);
-    iconHeaders.set('Cache-Control', 'public, max-age=86400');
+    iconHeaders.set("Cache-Control", "public, max-age=86400");
     return new Response(iconRes.body, {
       status: iconRes.status,
       headers: iconHeaders
     });
   }
-
-  // Serve PWA icon — Google Classroom product logo SVG (resolution-independent)
-  if (url.pathname === '/icon.svg') {
-    let iconRes = await fetch('https://fonts.gstatic.com/s/i/productlogos/classroom/v8/192px.svg');
+  if (url.pathname === "/icon.svg") {
+    let iconRes = await fetch("https://fonts.gstatic.com/s/i/productlogos/classroom/v8/192px.svg");
     const isSVG = iconRes.ok;
     if (!isSVG) {
-      // Fallback to the standard favicon if the versioned SVG is unavailable
-      iconRes = await fetch('https://ssl.gstatic.com/classroom/favicon.png');
+      iconRes = await fetch("https://ssl.gstatic.com/classroom/favicon.png");
     }
     const iconHeaders = new Headers(iconRes.headers);
-    iconHeaders.set('Content-Type', isSVG ? 'image/svg+xml' : 'image/png');
-    iconHeaders.set('Cache-Control', 'public, max-age=86400');
+    iconHeaders.set("Content-Type", isSVG ? "image/svg+xml" : "image/png");
+    iconHeaders.set("Cache-Control", "public, max-age=86400");
     return new Response(iconRes.body, {
       status: iconRes.status,
       headers: iconHeaders
     });
   }
-
-  // Serve 192x192 PNG icon for PWA (Chrome requires rasterized icons for install)
-  if (url.pathname === '/icon-192.png') {
-    let iconRes = await fetch('https://fonts.gstatic.com/s/i/productlogos/classroom/v8/192px.png');
+  if (url.pathname === "/icon-192.png") {
+    let iconRes = await fetch("https://fonts.gstatic.com/s/i/productlogos/classroom/v8/192px.png");
     if (!iconRes.ok) {
-      iconRes = await fetch('https://ssl.gstatic.com/classroom/favicon.png');
+      iconRes = await fetch("https://ssl.gstatic.com/classroom/favicon.png");
     }
     const iconHeaders = new Headers(iconRes.headers);
-    iconHeaders.set('Content-Type', 'image/png');
-    iconHeaders.set('Cache-Control', 'public, max-age=86400');
+    iconHeaders.set("Content-Type", "image/png");
+    iconHeaders.set("Cache-Control", "public, max-age=86400");
     return new Response(iconRes.body, {
       status: iconRes.status,
       headers: iconHeaders
     });
   }
-
-  // Serve 512x512 PNG icon for PWA splash screen
-  if (url.pathname === '/icon-512.png') {
-    let iconRes = await fetch('https://fonts.gstatic.com/s/i/productlogos/classroom/v8/512px.png');
+  if (url.pathname === "/icon-512.png") {
+    let iconRes = await fetch("https://fonts.gstatic.com/s/i/productlogos/classroom/v8/512px.png");
     if (!iconRes.ok) {
-      iconRes = await fetch('https://fonts.gstatic.com/s/i/productlogos/classroom/v8/192px.png');
+      iconRes = await fetch("https://fonts.gstatic.com/s/i/productlogos/classroom/v8/192px.png");
     }
     if (!iconRes.ok) {
-      iconRes = await fetch('https://ssl.gstatic.com/classroom/favicon.png');
+      iconRes = await fetch("https://ssl.gstatic.com/classroom/favicon.png");
     }
     const iconHeaders = new Headers(iconRes.headers);
-    iconHeaders.set('Content-Type', 'image/png');
-    iconHeaders.set('Cache-Control', 'public, max-age=86400');
+    iconHeaders.set("Content-Type", "image/png");
+    iconHeaders.set("Cache-Control", "public, max-age=86400");
     return new Response(iconRes.body, {
       status: iconRes.status,
       headers: iconHeaders
     });
   }
-  
-  // Proxy everything else to CloudMoon
   return proxyCloudMoon(request);
 }
-
+__name(handleRequest, "handleRequest");
 async function proxyCloudMoon(request) {
   const url = new URL(request.url);
-  
-  // Build the target URL
   let targetURL;
-  
-  if (url.pathname.startsWith('/proxy/')) {
-    // Extract and decode the proxied URL
-    const encodedURL = url.pathname.substring('/proxy/'.length);
+  if (url.pathname.startsWith("/proxy/")) {
+    const encodedURL = url.pathname.substring("/proxy/".length);
     try {
       targetURL = decodeURIComponent(encodedURL);
-      // Add back query string if present
       if (url.search) {
         targetURL += url.search;
       }
     } catch (e) {
-      console.error('Failed to decode proxy URL:', encodedURL);
-      return new Response('Invalid proxy URL', { status: 400 });
+      console.error("Failed to decode proxy URL:", encodedURL);
+      return new Response("Invalid proxy URL", { status: 400 });
     }
   } else {
-    // Direct proxy to CloudMoon
-    targetURL = 'https://web.cloudmoonapp.com' + url.pathname + url.search;
+    targetURL = "https://web.cloudmoonapp.com" + url.pathname + url.search;
   }
-  
-  // Block ad requests
   if (isAdRequest(targetURL)) {
-    console.log('Blocked ad request:', targetURL);
-    return new Response('', { status: 204 });
+    console.log("[Ad Blocked] Blocked an add URL request for recource savings:", targetURL);
+    return new Response("", { status: 204 });
   }
-  
-  console.log('Proxying:', targetURL);
-  
+  console.log("Proxying:", targetURL);
   const headers = new Headers(request.headers);
-  headers.set('Host', new URL(targetURL).host);
-  headers.delete('cf-connecting-ip');
-  headers.delete('cf-ray');
-  headers.delete('x-forwarded-proto');
-  headers.delete('x-real-ip');
-  
-  if (!headers.has('User-Agent')) {
-    headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+  headers.set("Host", new URL(targetURL).host);
+  headers.delete("cf-connecting-ip");
+  headers.delete("cf-ray");
+  headers.delete("x-forwarded-proto");
+  headers.delete("x-real-ip");
+  if (!headers.has("User-Agent")) {
+    headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
   }
-  
   const proxyRequest = new Request(targetURL, {
     method: request.method,
-    headers: headers,
+    headers,
     body: request.body,
-    redirect: 'follow'
+    redirect: "follow"
   });
-  
   let response;
   try {
     response = await fetch(proxyRequest);
   } catch (error) {
-    console.error('Proxy fetch failed:', error);
-    return new Response('Failed to fetch resource', { status: 502 });
+    console.error("Proxy fetch failed:", error);
+    return new Response("Failed to fetch resource", { status: 502 });
   }
-  
-  // If response is 404, log it but still return it
   if (response.status === 404) {
-    console.log('Resource not found (404):', targetURL);
+    console.log("[Worker] Resource could not found (404):", targetURL);
   }
-  
   const newHeaders = new Headers(response.headers);
-  newHeaders.set('Access-Control-Allow-Origin', '*');
-  newHeaders.set('Access-Control-Allow-Methods', '*');
-  newHeaders.set('Access-Control-Allow-Headers', '*');
-  newHeaders.set('Access-Control-Allow-Credentials', 'true');
-  newHeaders.delete('Content-Security-Policy');
-  newHeaders.delete('X-Frame-Options');
-  newHeaders.delete('Frame-Options');
-  
-  const contentType = response.headers.get('Content-Type') || '';
-  
-  if (contentType.includes('text/html')) {
+  newHeaders.set("Access-Control-Allow-Origin", "*");
+  newHeaders.set("Access-Control-Allow-Methods", "*");
+  newHeaders.set("Access-Control-Allow-Headers", "*");
+  newHeaders.set("Access-Control-Allow-Credentials", "true");
+  newHeaders.delete("Content-Security-Policy");
+  newHeaders.delete("X-Frame-Options");
+  newHeaders.delete("Frame-Options");
+  const contentType = response.headers.get("Content-Type") || "";
+  if (contentType.includes("text/html")) {
     let html = await response.text();
-    
-    // Remove ad-related elements and scripts
     html = blockAdsInHTML(html);
-    
     const injectionCode = `
 <style id="cm-ad-blocker-css">
   /* Hide ONLY the specific ad container divs */
@@ -251,7 +213,7 @@ async function proxyCloudMoon(request) {
   window.fetch = function(...args) {
     const url = args[0];
     if (typeof url === 'string' && isAdUrl(url)) {
-      console.log('[Ad Blocked]', url);
+      console.log('[Ad Blocked] An add has been blocked to save client recources from', url);
       return Promise.reject(new Error('Ad blocked'));
     }
     return originalFetch.apply(this, args);
@@ -260,7 +222,7 @@ async function proxyCloudMoon(request) {
   const originalXHR = window.XMLHttpRequest.prototype.open;
   window.XMLHttpRequest.prototype.open = function(method, url) {
     if (isAdUrl(url)) {
-      console.log('[Ad Blocked]', url);
+      console.log('[Ad Blocked] An add has been blocked to save client recources from', url);
       return;
     }
     return originalXHR.apply(this, arguments);
@@ -353,7 +315,7 @@ async function proxyCloudMoon(request) {
     document.addEventListener("DOMContentLoaded", function() {
       fixButtons();
       removeAds();
-      console.log('[CloudMoon] DOM ready - ads removed');
+      console.log('[Worker] DOM ready, all ads have been removed');
     });
   }
   
@@ -361,7 +323,7 @@ async function proxyCloudMoon(request) {
   window.addEventListener("load", function() {
     fixButtons();
     removeAds();
-    console.log('[CloudMoon] Window loaded - ads removed');
+    console.log('[Worker] Window sucessfully loaded, all ads have been removed');
   });
   
   // Run every 200ms (balanced performance and ad blocking)
@@ -427,7 +389,7 @@ async function proxyCloudMoon(request) {
       sendGameUrl(u);
       return makeFakeWindow();
     }
-    // about:blank / no-URL pattern — return fake window to capture subsequent location.href set
+    // about:blank / no-URL pattern \u2014 return fake window to capture subsequent location.href set
     if (!u || u === '' || u === 'about:blank') {
       return makeFakeWindow();
     }
@@ -561,7 +523,7 @@ async function proxyCloudMoon(request) {
           document.removeEventListener('mozfullscreenchange', fullscreenExitHandler);
           document.removeEventListener('MSFullscreenChange', fullscreenExitHandler);
           
-          console.log('[CloudMoon] Fullscreen exited, UI restored');
+          console.log('[Worker] Fullscreen exited by client, UI has been restored sucessfully');
         };
         
         // Add listeners for fullscreen exit (cross-browser)
@@ -570,9 +532,9 @@ async function proxyCloudMoon(request) {
         document.addEventListener('mozfullscreenchange', fullscreenExitHandler);
         document.addEventListener('MSFullscreenChange', fullscreenExitHandler);
         
-        console.log('[CloudMoon] Game container fullscreen requested with UI overlay');
+        console.log('[Worker] Game container fullscreen requested from client with UI overlay');
       } else {
-        console.log('[CloudMoon] Game container not found, using document fullscreen');
+        console.log('[Worker] Game container not found, using document fullscreen temporarialy');
         if (document.documentElement.requestFullscreen) {
           document.documentElement.requestFullscreen();
         }
@@ -580,67 +542,50 @@ async function proxyCloudMoon(request) {
     }
   });
   
-  console.log("[CloudMoon Fix] Initialized with ad blocking");
+  console.log("[Worker] Initialized with ad blocking to save client recources");
 })();
-</script>`;
-    
-    if (html.includes('</head>')) {
-      html = html.replace('</head>', injectionCode + '</head>');
+<\/script>`;
+    if (html.includes("</head>")) {
+      html = html.replace("</head>", injectionCode + "</head>");
     } else {
       html = injectionCode + html;
     }
-    
     return new Response(html, {
       status: response.status,
       statusText: response.statusText,
       headers: newHeaders
     });
   }
-  
-  // Block ads in JavaScript files
-  if (contentType.includes('javascript') || contentType.includes('application/x-javascript')) {
+  if (contentType.includes("javascript") || contentType.includes("application/x-javascript")) {
     const targetUrlLower = targetURL.toLowerCase();
     if (isAdRequest(targetURL)) {
-      console.log('Blocked ad script:', targetURL);
-      return new Response('// Ad script blocked', {
+      console.log("[Ad Blocked] Blocked ad script to save client recources:", targetURL);
+      return new Response("// Ad script blocked", {
         status: 200,
-        headers: { 'Content-Type': 'application/javascript' }
+        headers: { "Content-Type": "application/javascript" }
       });
     }
   }
-  
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
     headers: newHeaders
   });
 }
-
+__name(proxyCloudMoon, "proxyCloudMoon");
 function blockAdsInHTML(html) {
-  // Remove Google AdSense scripts
-  html = html.replace(/<script[^>]*googlesyndication[^>]*>[\s\S]*?<\/script>/gi, '');
-  html = html.replace(/<script[^>]*adsbygoogle[^>]*>[\s\S]*?<\/script>/gi, '');
-  
-  // Remove Google Analytics
-  html = html.replace(/<script[^>]*google-analytics[^>]*>[\s\S]*?<\/script>/gi, '');
-  html = html.replace(/<script[^>]*googletagmanager[^>]*>[\s\S]*?<\/script>/gi, '');
-  
-  // Remove DoubleClick
-  html = html.replace(/<script[^>]*doubleclick[^>]*>[\s\S]*?<\/script>/gi, '');
-  
-  // Remove ad iframes
-  html = html.replace(/<iframe[^>]*googlesyndication[^>]*>[\s\S]*?<\/iframe>/gi, '');
-  html = html.replace(/<iframe[^>]*doubleclick[^>]*>[\s\S]*?<\/iframe>/gi, '');
-  
-  // Remove ad insertion elements
-  html = html.replace(/<ins[^>]*adsbygoogle[^>]*>[\s\S]*?<\/ins>/gi, '');
-  
-  // Remove divs with ad IDs
-  html = html.replace(/<div[^>]*id="google_ads[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
-  
+  html = html.replace(/<script[^>]*googlesyndication[^>]*>[\s\S]*?<\/script>/gi, "");
+  html = html.replace(/<script[^>]*adsbygoogle[^>]*>[\s\S]*?<\/script>/gi, "");
+  html = html.replace(/<script[^>]*google-analytics[^>]*>[\s\S]*?<\/script>/gi, "");
+  html = html.replace(/<script[^>]*googletagmanager[^>]*>[\s\S]*?<\/script>/gi, "");
+  html = html.replace(/<script[^>]*doubleclick[^>]*>[\s\S]*?<\/script>/gi, "");
+  html = html.replace(/<iframe[^>]*googlesyndication[^>]*>[\s\S]*?<\/iframe>/gi, "");
+  html = html.replace(/<iframe[^>]*doubleclick[^>]*>[\s\S]*?<\/iframe>/gi, "");
+  html = html.replace(/<ins[^>]*adsbygoogle[^>]*>[\s\S]*?<\/ins>/gi, "");
+  html = html.replace(/<div[^>]*id="google_ads[^"]*"[^>]*>[\s\S]*?<\/div>/gi, "");
   return html;
 }
-
+__name(blockAdsInHTML, "blockAdsInHTML");
 function getMainHTML() {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -701,7 +646,7 @@ function getMainHTML() {
             outline: none;
         }
 
-        /* Floating button dock — bottom left */
+        /* Floating button dock \u2014 bottom left */
         #btn-dock {
             position: fixed;
             bottom: 18px;
@@ -824,7 +769,7 @@ function getMainHTML() {
                     shadowRoot.appendChild(nextHost);
                     currentHost = nextHost;
                     
-                    console.log(\`%c Shadow Layer \${i + 1} created\`, 'color: #667eea; font-weight: bold;');
+                    console.log('[Worker] Shadow DOM created sucessfully');
                 } else {
                     const iframe = document.createElement('iframe');
                     iframe.style.width = '100%';
@@ -858,11 +803,11 @@ function getMainHTML() {
                         console.error('Iframe error:', e);
                     });
                     
-                    console.log(\`%c Final Shadow Layer \${SHADOW_LAYERS} with iframe created\`, 'color: #10b981; font-weight: bold;');
+                    console.log('[Worker] Fianal Shadow DOM created sucessfully');
                 }
             }
             
-            console.log(\`%c \${SHADOW_LAYERS}-Layer Shadow DOM Protection Active\`, 'color: #667eea; font-size: 14px; font-weight: bold;');
+            console.log('[Worker] Layer shadow DOM Active');
         }
         
         function generateRandomId() {
@@ -899,7 +844,7 @@ function getMainHTML() {
             if (event.origin !== window.location.origin) return;
             if (event.data && event.data.type === 'LOAD_GAME') {
                 const gameUrl = event.data.url;
-                console.log('Game URL received:', gameUrl);
+                console.log('[Worker] Game streem / URL received to be redirected to the client:', gameUrl);
                 loadGame(gameUrl);
             }
         });
@@ -912,19 +857,19 @@ function getMainHTML() {
             if (url.includes(workerDomain)) {
                 // Already on our domain, use as-is (avoid double-proxying)
                 fixedURL = url;
-                console.log('Game URL already on worker domain, using directly');
+                console.log('[Worker] Game URL is already on worker domain, using the link directly');
             } else if (url.includes('://')) {
                 // External URL - proxy it through worker
                 fixedURL = workerDomain + '/proxy/' + encodeURIComponent(url);
-                console.log('External game URL, proxying through worker');
+                console.log('[Worker] External game URL detected, proxying the URL through worker');
             } else if (url.startsWith('/')) {
                 // Relative URL - keep it (will be proxied automatically)
                 fixedURL = url;
-                console.log('Relative game URL, using as-is');
+                console.log('[Worker] Relative game URL, using as-is in the worker');
             }
             
-            console.log(\`%c Loading game with \${SHADOW_LAYERS}-layer Shadow DOM protection\`, 'color: #667eea; font-weight: bold;');
-            console.log('Final game URL:', fixedURL);
+            console.log('[Worker] Game loaded sucessfully via the Shadow DOM');
+            console.log('[Worker] Final game URL created by the worker:', fixedURL);
             
             createMultiLayerShadowFrame(fixedURL, true);
             
@@ -956,32 +901,33 @@ function getMainHTML() {
             }
         }
         
-        console.log('%c CloudMoon Proxy Active with Ad Blocking', 'color: #667eea; font-size: 18px; font-weight: bold;');
-        console.log(\`%c Multi-Layer Shadow DOM Protection: \${SHADOW_LAYERS} Layers\`, 'color: #10b981; font-size: 14px; font-weight: bold;');
+        console.log('[Worker] Welcome to CLOUDMOON-INPLAY, a Cloudflare Workers proxy for Cloudmoon, developed by Sriail for low-recource systems. For more information, visit https://github.com/sriail/Cloudmoon-InPlay for our official repo!')
+        console.log('[Worker] CLOUDMOON-INPLAY Proxy is active; establishing conections, and proxying the current page content');
+        console.log('[Worker] Shadow DOM container establishing');
         
         // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
-                console.log('%c PWA Service Worker registered', 'color: #667eea; font-weight: bold;');
+                console.log('[Worker] PWA Service Worker has been registered successfully');
                 
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            console.log('%c New version available!', 'color: #10b981; font-weight: bold;');
+                            console.log('[Worker Updater] New version of CLOUDMOON-INPLAY is available! If you are the owner of this deployment, please manualy update the worker for the latest versions and updates. You can find more information at https://github.com/sriail/Cloudmoon-InPlay and https://developers.cloudflare.com/workers/configuration/versions-and-deployments/');
                         }
                     });
                 });
 
                 navigator.serviceWorker.ready.then(() => {
-                    console.log('%c Service Worker is controlling the page', 'color: #10b981; font-weight: bold;');
+                    console.log('[Worker] Service Worker is controlling the page for client navigation');
                 });
 
             })
             .catch((error) => {
-                console.log('Service Worker registration failed:', error);
+                console.log('[Worker] Navigational Service Worker registration failed:', error);
             });
     });
 }
@@ -1012,29 +958,24 @@ if ('serviceWorker' in navigator) {
             deferredPrompt = null;
             installBtn.style.display = 'none';
         });
-    </script>
+    <\/script>
 </body>
 </html>`;
 }
-
+__name(getMainHTML, "getMainHTML");
 function getManifest() {
   return JSON.stringify({
     "id": "/?source=pwa",
     "name": "Google Classroom",
     "short_name": "Classroom",
     "description": "A Simple way for Parents, Students, And teachers to connect trought learning using Googles most powerfull Google classroom version yet",
-    
     "start_url": "/?source=pwa",
     "scope": "/",
-    
     "display": "standalone",
     "display_override": ["standalone", "minimal-ui"],
-    
     "background_color": "#0d1117",
     "theme_color": "#2d2d2d",
-    
     "orientation": "any",
-    
     "icons": [
       {
         "src": "/icon-192.png",
@@ -1067,13 +1008,11 @@ function getManifest() {
         "purpose": "any"
       }
     ],
-    
     "categories": ["games", "entertainment"],
-    
     "prefer_related_applications": false
   });
 }
-
+__name(getManifest, "getManifest");
 function getServiceWorker() {
   return `// CloudMoon InPlay Service Worker
 const CACHE_NAME = 'cloudmoon-v3';
@@ -1081,10 +1020,10 @@ const RUNTIME_CACHE = 'cloudmoon-runtime-v3';
 
 // Install event - cache essential resources
 self.addEventListener('install', (event) => {
-  console.log('[ServiceWorker] Install');
+  console.log('[Service Worker] Installing the PWA from the current repo');
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      console.log('[ServiceWorker] Caching app shell');
+      console.log('[Service Worker] Caching the app shell');
       // Cache critical resources; skip optional ones that may fail (e.g. proxied icons)
       const critical = ['/', '/manifest.json', '/sw.js'];
       const optional = ['/favicon.png', '/icon.svg', '/icon-192.png', '/icon-512.png'];
@@ -1094,7 +1033,7 @@ self.addEventListener('install', (event) => {
           fetch(url).then(res => {
             if (res && res.status === 200) return cache.put(url, res);
           }).catch((err) => {
-            console.log('[ServiceWorker] Optional resource not cached:', url, err);
+            console.log('[Service Worker] Optional resource have not been cached:', url, err);
           })
         )
       );
@@ -1105,13 +1044,13 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('[ServiceWorker] Activate');
+  console.log('[Service Worker] the PWA is currentley Activate');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
-            console.log('[ServiceWorker] Removing old cache', cacheName);
+            console.log('[Service Worker] Removing the old site / PWA cache', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -1150,7 +1089,7 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch((error) => {
-        console.log('[ServiceWorker] Fetch failed, trying cache:', event.request.url);
+        console.log('[Service Worker] Fetch failed, trying the local cache:', event.request.url);
         // If network fails, try to serve from cache
         return caches.match(event.request).then((response) => {
           if (response) {
@@ -1178,3 +1117,8 @@ self.addEventListener('message', (event) => {
   }
 });`;
 }
+__name(getServiceWorker, "getServiceWorker");
+export {
+  worker_default as default
+};
+//# sourceMappingURL=worker.js.map
