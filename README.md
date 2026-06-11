@@ -222,7 +222,7 @@ Optional second DOM Embed layer (Recommended if under heavy restrictions, to use
 > Because of google's authentication policies, the google sign in button will NOT WORK. You must hit sign in with email and password instead. You will also need to register your cloudmoon account at home with google and set a password in settings before using elsewhere (Google Sign In button is now visibly hidden to avoid confusion).
 
 Once you sign in, you can click and play games or apps in Cloudmoons library!
-After that, you can use the Control bar for navigation, and go home using the home button, as well as fullscreening in-game (since many School / Work Pcs use low end hardwher runing Windows 10 or Chrome OS, all ads are proxied and removed, striping any unecacary content)
+After that, you can use the Control bar for navigation, and go home using the home button, as well as fullscreening in-game (since many School / Work Pc's use low end components runing Windows 10 or Chrome OS, all ads are proxied and removed, striping any unecacary content)
 
 
 > [!NOTE]
