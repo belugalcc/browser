@@ -59,20 +59,20 @@ async function handleRequest(request) {
   const url = new URL(request.url);
   
   if (url.pathname === "/" || url.pathname === "") {
-    return new Response("Proxy Server Active", {
-      headers: { "Content-Type": "text/plain" }
-    });
+    return proxyRequest(request, "https://browser.lol/en/create");
   }
 
   return proxyRequest(request);
 }
 __name(handleRequest, "handleRequest");
 
-async function proxyRequest(request) {
+async function proxyRequest(request, overrideURL = null) {
   const url = new URL(request.url);
   let targetURL;
 
-  if (url.pathname.startsWith("/proxy/")) {
+  if (overrideURL) {
+    targetURL = overrideURL;
+  } else if (url.pathname.startsWith("/proxy/")) {
     const encodedURL = url.pathname.substring("/proxy/".length);
     try {
       targetURL = decodeURIComponent(encodedURL);
