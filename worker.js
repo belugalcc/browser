@@ -189,6 +189,10 @@ async function proxyCloudMoon(request) {
   if (contentType.includes("text/html")) {
     let html = await response.text();
     html = blockAdsInHTML(html);
+    
+    // Check if this is the /en/create page
+    const isCreatePage = targetURL.includes("/en/create");
+    
     const injectionCode = `
 <style id="cm-ad-blocker-css">
   /* Hide ONLY the specific ad container divs */
@@ -389,7 +393,7 @@ async function proxyCloudMoon(request) {
       sendGameUrl(u);
       return makeFakeWindow();
     }
-    // about:blank / no-URL pattern \u2014 return fake window to capture subsequent location.href set
+    // about:blank / no-URL pattern — return fake window to capture subsequent location.href set
     if (!u || u === '' || u === 'about:blank') {
       return makeFakeWindow();
     }
@@ -545,10 +549,81 @@ async function proxyCloudMoon(request) {
   console.log("[Worker] Initialized with ad blocking to save client recources");
 })();
 <\/script>`;
+    
+    const createPageInjection = `
+<script id="cm-create-form-extractor">
+(function(){
+  function runFormExtractor() {
+    const form = document.querySelector("form");
+    if (!form) {
+      console.log("[Form Extractor] Form not found, retrying...");
+      return;
+    }
+    
+    console.log("[Form Extractor] Form found, executing extractor...");
+    
+    // Extract the form
+    document.body.innerHTML = "";
+    document.body.appendChild(form);
+    
+    // Remove specific buttons
+    document.querySelectorAll("button").forEach(btn => {
+      const txt = btn.textContent.replace(/\\s+/g, " ").trim();
+      if (["Brave", "Opera", "Tor", "Vivaldi"].some(x => txt.includes(x))) {
+        console.log("[Form Extractor] Removing button:", txt);
+        btn.remove();
+      }
+    });
+    
+    // Remove server location / premium sections
+    document.querySelectorAll("*").forEach(el => {
+      if (el.textContent.includes("Server Location") && el.textContent.includes("Premium")) {
+        const box = el.closest(".space-y-2");
+        if (box) {
+          console.log("[Form Extractor] Removing premium server section");
+          box.remove();
+        }
+      }
+    });
+    
+    console.log("[Form Extractor] Form extraction complete!");
+  }
+  
+  // Try immediately
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", runFormExtractor);
+  } else {
+    runFormExtractor();
+  }
+  
+  // Retry every 500ms for 5 seconds in case form loads dynamically
+  let retryCount = 0;
+  const retryInterval = setInterval(() => {
+    if (document.querySelector("form")) {
+      clearInterval(retryInterval);
+      runFormExtractor();
+    }
+    retryCount++;
+    if (retryCount > 10) {
+      clearInterval(retryInterval);
+      console.log("[Form Extractor] Form not found after retries");
+    }
+  }, 500);
+})();
+<\/script>`;
+    
     if (html.includes("</head>")) {
-      html = html.replace("</head>", injectionCode + "</head>");
+      if (isCreatePage) {
+        html = html.replace("</head>", injectionCode + createPageInjection + "</head>");
+      } else {
+        html = html.replace("</head>", injectionCode + "</head>");
+      }
     } else {
-      html = injectionCode + html;
+      if (isCreatePage) {
+        html = injectionCode + createPageInjection + html;
+      } else {
+        html = injectionCode + html;
+      }
     }
     return new Response(html, {
       status: response.status,
@@ -646,7 +721,7 @@ function getMainHTML() {
             outline: none;
         }
 
-        /* Floating button dock \u2014 bottom left */
+        /* Floating button dock — bottom left */
         #btn-dock {
             position: fixed;
             bottom: 18px;
@@ -727,8 +802,8 @@ function getMainHTML() {
         let shadowRoots = [];
         let currentIframe = null;
         
-        const SANDBOX_HOME = 'allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-downloads allow-pointer-lock allow-top-navigation-by-user-activation';
-        const SANDBOX_GAME = 'allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-downloads allow-pointer-lock allow-top-navigation-by-user-activation';
+        const SANDBOX_HOME = 'allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-downloads allow-pointer-lock allow-top-[...]
+        const SANDBOX_GAME = 'allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-downloads allow-pointer-lock allow-top-[...]
         const ALLOW_PERMISSIONS = 'accelerometer; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; clipboard-read; clipboard-write; xr-spatial-tracking; gamepad';
         
         const SHADOW_LAYERS = 4;
@@ -901,7 +976,7 @@ function getMainHTML() {
             }
         }
         
-        console.log('[Worker] Welcome to CLOUDMOON-INPLAY, a Cloudflare Workers proxy for Cloudmoon, developed by Sriail for low-recource systems. For more information, visit https://github.com/sriail/Cloudmoon-InPlay for our official repo!')
+        console.log('[Worker] Welcome to CLOUDMOON-INPLAY, a Cloudflare Workers proxy for Cloudmoon, developed by Sriail for low-recource systems. For more information, visit https://github.com/s[...]
         console.log('[Worker] CLOUDMOON-INPLAY Proxy is active; establishing conections, and proxying the current page content');
         console.log('[Worker] Shadow DOM container establishing');
         
@@ -916,7 +991,7 @@ if ('serviceWorker' in navigator) {
                     const newWorker = registration.installing;
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            console.log('[Worker Updater] New version of CLOUDMOON-INPLAY is available! If you are the owner of this deployment, please manualy update the worker for the latest versions and updates. You can find more information at https://github.com/sriail/Cloudmoon-InPlay and https://developers.cloudflare.com/workers/configuration/versions-and-deployments/');
+                            console.log('[Worker Updater] New version of CLOUDMOON-INPLAY is available! If you are the owner of this deployment, please manualy update the worker for the latest ve[...]
                         }
                     });
                 });
